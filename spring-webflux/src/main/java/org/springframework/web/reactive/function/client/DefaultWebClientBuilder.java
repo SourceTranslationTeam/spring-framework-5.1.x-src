@@ -25,12 +25,9 @@ import java.util.function.Consumer;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.reactive.ClientHttpConnector;
-import org.springframework.http.client.reactive.JettyClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.codec.ClientCodecConfigurer;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -41,21 +38,9 @@ import org.springframework.web.util.UriBuilderFactory;
  * Default implementation of {@link WebClient.Builder}.
  *
  * @author Rossen Stoyanchev
- * @author Brian Clozel
  * @since 5.0
  */
 final class DefaultWebClientBuilder implements WebClient.Builder {
-
-	private static final boolean reactorClientPresent;
-
-	private static final boolean jettyClientPresent;
-
-	static {
-		ClassLoader loader = DefaultWebClientBuilder.class.getClassLoader();
-		reactorClientPresent = ClassUtils.isPresent("reactor.netty.http.client.HttpClient", loader);
-		jettyClientPresent = ClassUtils.isPresent("org.eclipse.jetty.client.HttpClient", loader);
-	}
-
 
 	@Nullable
 	private String baseUrl;
@@ -81,17 +66,14 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 	@Nullable
 	private ClientHttpConnector connector;
 
-	@Nullable
-	private ExchangeStrategies strategies;
-
-	@Nullable
-	private List<Consumer<ExchangeStrategies.Builder>> strategiesConfigurers;
+	private ExchangeStrategies exchangeStrategies;
 
 	@Nullable
 	private ExchangeFunction exchangeFunction;
 
 
 	public DefaultWebClientBuilder() {
+		this.exchangeStrategies = ExchangeStrategies.withDefaults();
 	}
 
 	public DefaultWebClientBuilder(DefaultWebClientBuilder other) {
@@ -113,7 +95,7 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 		this.defaultRequest = other.defaultRequest;
 		this.filters = other.filters != null ? new ArrayList<>(other.filters) : null;
 		this.connector = other.connector;
-		this.strategies = other.strategies;
+		this.exchangeStrategies = other.exchangeStrategies;
 		this.exchangeFunction = other.exchangeFunction;
 	}
 
@@ -208,27 +190,9 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 	}
 
 	@Override
-	public WebClient.Builder codecs(Consumer<ClientCodecConfigurer> configurer) {
-		if (this.strategiesConfigurers == null) {
-			this.strategiesConfigurers = new ArrayList<>(4);
-		}
-		this.strategiesConfigurers.add(builder -> builder.codecs(configurer));
-		return this;
-	}
-
-	@Override
 	public WebClient.Builder exchangeStrategies(ExchangeStrategies strategies) {
-		this.strategies = strategies;
-		return this;
-	}
-
-	@SuppressWarnings("deprecation")
-	@Override
-	public WebClient.Builder exchangeStrategies(Consumer<ExchangeStrategies.Builder> configurer) {
-		if (this.strategiesConfigurers == null) {
-			this.strategiesConfigurers = new ArrayList<>(4);
-		}
-		this.strategiesConfigurers.add(configurer);
+		Assert.notNull(strategies, "ExchangeStrategies must not be null");
+		this.exchangeStrategies = strategies;
 		return this;
 	}
 
@@ -251,9 +215,7 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 
 	@Override
 	public WebClient build() {
-		ExchangeFunction exchange = (this.exchangeFunction == null ?
-				ExchangeFunctions.create(getOrInitConnector(), initExchangeStrategies()) :
-				this.exchangeFunction);
+		ExchangeFunction exchange = initExchangeFunction();
 		ExchangeFunction filteredExchange = (this.filters != null ? this.filters.stream()
 				.reduce(ExchangeFilterFunction::andThen)
 				.map(filter -> filter.apply(exchange))
@@ -264,29 +226,16 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 				this.defaultRequest, new DefaultWebClientBuilder(this));
 	}
 
-	private ClientHttpConnector getOrInitConnector() {
-		if (this.connector != null) {
-			return this.connector;
+	private ExchangeFunction initExchangeFunction() {
+		if (this.exchangeFunction != null) {
+			return this.exchangeFunction;
 		}
-		else if (reactorClientPresent) {
-			return new ReactorClientHttpConnector();
+		else if (this.connector != null) {
+			return ExchangeFunctions.create(this.connector, this.exchangeStrategies);
 		}
-		else if (jettyClientPresent) {
-			return new JettyClientHttpConnector();
+		else {
+			return ExchangeFunctions.create(new ReactorClientHttpConnector(), this.exchangeStrategies);
 		}
-		throw new IllegalStateException("No suitable default ClientHttpConnector found");
-	}
-
-	private ExchangeStrategies initExchangeStrategies() {
-		if (CollectionUtils.isEmpty(this.strategiesConfigurers)) {
-			return this.strategies != null ? this.strategies : ExchangeStrategies.withDefaults();
-		}
-
-		ExchangeStrategies.Builder builder =
-				this.strategies != null ? this.strategies.mutate() : ExchangeStrategies.builder();
-
-		this.strategiesConfigurers.forEach(configurer -> configurer.accept(builder));
-		return builder.build();
 	}
 
 	private UriBuilderFactory initUriBuilderFactory() {

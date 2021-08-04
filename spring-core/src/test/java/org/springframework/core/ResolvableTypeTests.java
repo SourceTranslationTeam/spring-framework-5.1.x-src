@@ -684,14 +684,8 @@ public class ResolvableTypeTests {
 
 	@Test
 	public void resolveBoundedTypeVariableResult() throws Exception {
-		ResolvableType type = ResolvableType.forMethodReturnType(Methods.class.getMethod("boundedTypeVariableResult"));
+		ResolvableType type = ResolvableType.forMethodReturnType(Methods.class.getMethod("boundedTypeVaraibleResult"));
 		assertThat(type.resolve(), equalTo((Class) CharSequence.class));
-	}
-
-	@Test
-	public void resolveBoundedTypeVariableWildcardResult() throws Exception {
-		ResolvableType type = ResolvableType.forMethodReturnType(Methods.class.getMethod("boundedTypeVariableWildcardResult"));
-		assertThat(type.getGeneric(1).asCollection().resolveGeneric(), equalTo((Class) CharSequence.class));
 	}
 
 	@Test
@@ -701,14 +695,27 @@ public class ResolvableTypeTests {
 	}
 
 	@Test
-	public void resolveTypeVariableFromSimpleInterfaceType() {
+	public void resolveTypeVaraibleFromMethodReturn() throws Exception {
+		ResolvableType type = ResolvableType.forMethodReturnType(Methods.class.getMethod("typedReturn"));
+		assertThat(type.resolve(), nullValue());
+	}
+
+	@Test
+	public void resolveTypeVaraibleFromMethodReturnWithInstanceClass() throws Exception {
+		ResolvableType type = ResolvableType.forMethodReturnType(
+				Methods.class.getMethod("typedReturn"), TypedMethods.class);
+		assertThat(type.resolve(), equalTo((Class) String.class));
+	}
+
+	@Test
+	public void resolveTypeVaraibleFromSimpleInterfaceType() {
 		ResolvableType type = ResolvableType.forClass(
 				MySimpleInterfaceType.class).as(MyInterfaceType.class);
 		assertThat(type.resolveGeneric(), equalTo((Class) String.class));
 	}
 
 	@Test
-	public void resolveTypeVariableFromSimpleCollectionInterfaceType() {
+	public void resolveTypeVaraibleFromSimpleCollectionInterfaceType() {
 		ResolvableType type = ResolvableType.forClass(
 				MyCollectionInterfaceType.class).as(MyInterfaceType.class);
 		assertThat(type.resolveGeneric(), equalTo((Class) Collection.class));
@@ -716,14 +723,14 @@ public class ResolvableTypeTests {
 	}
 
 	@Test
-	public void resolveTypeVariableFromSimpleSuperclassType() {
+	public void resolveTypeVaraibleFromSimpleSuperclassType() {
 		ResolvableType type = ResolvableType.forClass(
 				MySimpleSuperclassType.class).as(MySuperclassType.class);
 		assertThat(type.resolveGeneric(), equalTo((Class) String.class));
 	}
 
 	@Test
-	public void resolveTypeVariableFromSimpleCollectionSuperclassType() {
+	public void resolveTypeVaraibleFromSimpleCollectionSuperclassType() {
 		ResolvableType type = ResolvableType.forClass(
 				MyCollectionSuperclassType.class).as(MySuperclassType.class);
 		assertThat(type.resolveGeneric(), equalTo((Class) Collection.class));
@@ -1452,9 +1459,7 @@ public class ResolvableTypeTests {
 
 		void charSequenceParameter(List<CharSequence> cs);
 
-		<R extends CharSequence & Serializable> R boundedTypeVariableResult();
-
-		Map<String, ? extends List<? extends CharSequence>> boundedTypeVariableWildcardResult();
+		<R extends CharSequence & Serializable> R boundedTypeVaraibleResult();
 
 		void nested(Map<Map<String, Integer>, Map<Byte, Long>> p);
 

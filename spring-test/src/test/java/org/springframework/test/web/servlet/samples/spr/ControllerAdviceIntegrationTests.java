@@ -16,7 +16,6 @@
 
 package org.springframework.test.web.servlet.samples.spr;
 
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Before;
@@ -26,7 +25,6 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Controller;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.context.web.WebAppConfiguration;
@@ -35,7 +33,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.annotation.RequestScope;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
@@ -67,52 +64,20 @@ public class ControllerAdviceIntegrationTests {
 	@Before
 	public void setUpMockMvc() {
 		this.mockMvc = webAppContextSetup(wac).build();
-		resetCounters();
 	}
 
 	@Test
 	public void controllerAdviceIsAppliedOnlyOnce() throws Exception {
-		this.mockMvc.perform(get("/test").param("requestParam", "foo"))//
+		assertEquals(0, SingletonControllerAdvice.counter.get());
+		assertEquals(0, RequestScopedControllerAdvice.counter.get());
+
+		this.mockMvc.perform(get("/test"))//
 				.andExpect(status().isOk())//
-				.andExpect(forwardedUrl("singleton:1;prototype:1;request-scoped:1;requestParam:foo"));
+				.andExpect(forwardedUrl("singleton:1;request-scoped:1"));
 
-		assertEquals(1, SingletonControllerAdvice.invocationCount.get());
-		assertEquals(1, PrototypeControllerAdvice.invocationCount.get());
-		assertEquals(1, RequestScopedControllerAdvice.invocationCount.get());
+		assertEquals(1, SingletonControllerAdvice.counter.get());
+		assertEquals(1, RequestScopedControllerAdvice.counter.get());
 	}
-
-	@Test
-	public void prototypeAndRequestScopedControllerAdviceBeansAreNotCached() throws Exception {
-		this.mockMvc.perform(get("/test").param("requestParam", "foo"))//
-				.andExpect(status().isOk())//
-				.andExpect(forwardedUrl("singleton:1;prototype:1;request-scoped:1;requestParam:foo"));
-
-		// singleton @ControllerAdvice beans should not be instantiated again.
-		assertEquals(0, SingletonControllerAdvice.instanceCount.get());
-		// prototype and request-scoped @ControllerAdvice beans should be instantiated once per request.
-		assertEquals(1, PrototypeControllerAdvice.instanceCount.get());
-		assertEquals(1, RequestScopedControllerAdvice.instanceCount.get());
-
-		this.mockMvc.perform(get("/test").param("requestParam", "bar"))//
-				.andExpect(status().isOk())//
-				.andExpect(forwardedUrl("singleton:2;prototype:2;request-scoped:2;requestParam:bar"));
-
-		// singleton @ControllerAdvice beans should not be instantiated again.
-		assertEquals(0, SingletonControllerAdvice.instanceCount.get());
-		// prototype and request-scoped @ControllerAdvice beans should be instantiated once per request.
-		assertEquals(2, PrototypeControllerAdvice.instanceCount.get());
-		assertEquals(2, RequestScopedControllerAdvice.instanceCount.get());
-	}
-
-	private static void resetCounters() {
-		SingletonControllerAdvice.invocationCount.set(0);
-		SingletonControllerAdvice.instanceCount.set(0);
-		PrototypeControllerAdvice.invocationCount.set(0);
-		PrototypeControllerAdvice.instanceCount.set(0);
-		RequestScopedControllerAdvice.invocationCount.set(0);
-		RequestScopedControllerAdvice.instanceCount.set(0);
-	}
-
 
 	@Configuration
 	@EnableWebMvc
@@ -129,12 +94,6 @@ public class ControllerAdviceIntegrationTests {
 		}
 
 		@Bean
-		@Scope("prototype")
-		PrototypeControllerAdvice prototypeControllerAdvice() {
-			return new PrototypeControllerAdvice();
-		}
-
-		@Bean
 		@RequestScope
 		RequestScopedControllerAdvice requestScopedControllerAdvice() {
 			return new RequestScopedControllerAdvice();
@@ -144,49 +103,22 @@ public class ControllerAdviceIntegrationTests {
 	@ControllerAdvice
 	static class SingletonControllerAdvice {
 
-		static final AtomicInteger instanceCount = new AtomicInteger();
-		static final AtomicInteger invocationCount = new AtomicInteger();
-
-		{
-			instanceCount.incrementAndGet();
-		}
+		static final AtomicInteger counter = new AtomicInteger();
 
 		@ModelAttribute
 		void initModel(Model model) {
-			model.addAttribute("singleton", invocationCount.incrementAndGet());
-		}
-	}
-
-	@ControllerAdvice
-	static class PrototypeControllerAdvice {
-
-		static final AtomicInteger instanceCount = new AtomicInteger();
-		static final AtomicInteger invocationCount = new AtomicInteger();
-
-		{
-			instanceCount.incrementAndGet();
-		}
-
-		@ModelAttribute
-		void initModel(Model model) {
-			model.addAttribute("prototype", invocationCount.incrementAndGet());
+			model.addAttribute("singleton", counter.incrementAndGet());
 		}
 	}
 
 	@ControllerAdvice
 	static class RequestScopedControllerAdvice {
 
-		static final AtomicInteger instanceCount = new AtomicInteger();
-		static final AtomicInteger invocationCount = new AtomicInteger();
-
-		{
-			instanceCount.incrementAndGet();
-		}
+		static final AtomicInteger counter = new AtomicInteger();
 
 		@ModelAttribute
-		void initModel(@RequestParam String requestParam, Model model) {
-			model.addAttribute("requestParam", requestParam);
-			model.addAttribute("request-scoped", invocationCount.incrementAndGet());
+		void initModel(Model model) {
+			model.addAttribute("request-scoped", counter.incrementAndGet());
 		}
 	}
 
@@ -195,11 +127,8 @@ public class ControllerAdviceIntegrationTests {
 
 		@GetMapping("/test")
 		String get(Model model) {
-			Map<String, Object> map = model.asMap();
-			return "singleton:" + map.get("singleton") +
-					";prototype:" + map.get("prototype") +
-					";request-scoped:" + map.get("request-scoped") +
-					";requestParam:" + map.get("requestParam");
+			return "singleton:" + model.asMap().get("singleton") + ";request-scoped:"
+					+ model.asMap().get("request-scoped");
 		}
 	}
 

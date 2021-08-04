@@ -872,12 +872,6 @@ public class ResolvableType implements Serializable {
 				return forType(ownerType, this.variableResolver).resolveVariable(variable);
 			}
 		}
-		if (this.type instanceof WildcardType) {
-			ResolvableType resolved = resolveType().resolveVariable(variable);
-			if (resolved != null) {
-				return resolved;
-			}
-		}
 		if (this.variableResolver != null) {
 			return this.variableResolver.resolveVariable(variable);
 		}
@@ -988,7 +982,7 @@ public class ResolvableType implements Serializable {
 	 * using the full generic type information for assignability checks.
 	 * For example: {@code ResolvableType.forClass(MyArrayList.class)}.
 	 * @param clazz the class to introspect ({@code null} is semantically
-	 * equivalent to {@code Object.class} for typical use cases here)
+	 * equivalent to {@code Object.class} for typical use cases here}
 	 * @return a {@link ResolvableType} for the specified class
 	 * @see #forClass(Class, Class)
 	 * @see #forClassWithGenerics(Class, Class...)
@@ -1003,7 +997,7 @@ public class ResolvableType implements Serializable {
 	 * {@link Class#isAssignableFrom}, which this serves as a wrapper for.
 	 * For example: {@code ResolvableType.forRawClass(List.class)}.
 	 * @param clazz the class to introspect ({@code null} is semantically
-	 * equivalent to {@code Object.class} for typical use cases here)
+	 * equivalent to {@code Object.class} for typical use cases here}
 	 * @return a {@link ResolvableType} for the specified class
 	 * @since 4.2
 	 * @see #forClass(Class)
@@ -1491,10 +1485,10 @@ public class ResolvableType implements Serializable {
 		@Override
 		@Nullable
 		public ResolvableType resolveVariable(TypeVariable<?> variable) {
-			TypeVariable<?> variableToCompare = SerializableTypeWrapper.unwrap(variable);
 			for (int i = 0; i < this.variables.length; i++) {
-				TypeVariable<?> resolvedVariable = SerializableTypeWrapper.unwrap(this.variables[i]);
-				if (ObjectUtils.nullSafeEquals(resolvedVariable, variableToCompare)) {
+				TypeVariable<?> v1 = SerializableTypeWrapper.unwrap(this.variables[i]);
+				TypeVariable<?> v2 = SerializableTypeWrapper.unwrap(variable);
+				if (ObjectUtils.nullSafeEquals(v1, v2)) {
 					return this.generics[i];
 				}
 			}

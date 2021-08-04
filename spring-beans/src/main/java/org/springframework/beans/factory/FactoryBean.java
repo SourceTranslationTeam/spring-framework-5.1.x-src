@@ -76,6 +76,7 @@ public interface FactoryBean<T> {
 	 * @see FactoryBeanNotInitializedException
 	 */
 	@Nullable
+	// 返回对象实例
 	T getObject() throws Exception;
 
 	/**
@@ -98,6 +99,7 @@ public interface FactoryBean<T> {
 	 * @see ListableBeanFactory#getBeansOfType
 	 */
 	@Nullable
+	// 获取Bean类型
 	Class<?> getObjectType();
 
 	/**

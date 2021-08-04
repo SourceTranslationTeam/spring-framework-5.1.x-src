@@ -110,11 +110,6 @@ public abstract class ClassUtils {
 	 */
 	private static final Set<Class<?>> javaLanguageInterfaces;
 
-	/**
-	 * Cache for equivalent methods on an interface implemented by the declaring class.
-	 */
-	private static final Map<Method, Method> interfaceMethodCache = new ConcurrentReferenceHashMap<>(256);
-
 
 	static {
 		primitiveWrapperTypeMap.put(Boolean.class, boolean.class);
@@ -1296,16 +1291,13 @@ public abstract class ClassUtils {
 	 * @see #getMostSpecificMethod
 	 */
 	public static Method getInterfaceMethodIfPossible(Method method) {
-		if (!Modifier.isPublic(method.getModifiers()) || method.getDeclaringClass().isInterface()) {
-			return method;
-		}
-		return interfaceMethodCache.computeIfAbsent(method, key -> {
-			Class<?> current = key.getDeclaringClass();
+		if (Modifier.isPublic(method.getModifiers()) && !method.getDeclaringClass().isInterface()) {
+			Class<?> current = method.getDeclaringClass();
 			while (current != null && current != Object.class) {
 				Class<?>[] ifcs = current.getInterfaces();
 				for (Class<?> ifc : ifcs) {
 					try {
-						return ifc.getMethod(key.getName(), key.getParameterTypes());
+						return ifc.getMethod(method.getName(), method.getParameterTypes());
 					}
 					catch (NoSuchMethodException ex) {
 						// ignore
@@ -1313,8 +1305,8 @@ public abstract class ClassUtils {
 				}
 				current = current.getSuperclass();
 			}
-			return key;
-		});
+		}
+		return method;
 	}
 
 	/**
